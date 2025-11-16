@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title>Snake (No Canvas) — Color & Patterns</title>
+    <style>
+        body {
+            font-family: Arial, Helvetica, sans-serif;
+            text-align: center;
+            margin: 12px;
+        }
+
+        #gameArea {
+            display: inline-block;
+            margin-top: 10px;
+            border: 2px solid #333;
+            background: #f8f8f8;
+        }
+
+        table.grid {
+            border-collapse: collapse;
+            margin: 0;
+            padding: 0;
+        }
+
+        table.grid td {
+            width: 18px;
+            height: 18px;
+            padding: 0;
+            margin: 0;
+            border: 1px solid #ddd;
+            background: #fff;
+        }
+
+        #controls {
+            margin-top: 10px;
+        }
+
+        button {
+            margin: 4px;
+            padding: 6px 10px;
+            cursor: pointer;
+        }
+
+        .panel {
+            display: inline-block;
+            text-align: left;
+            margin: 8px;
+            vertical-align: top;
+        }
+
+        #score {
+            font-weight: bold;
+        }
+
+        #info {
+            font-size: 12px;
+            color: #555;
+            margin-top: 6px;
+        }
+
+        /* small responsive: shrink cells if viewport narrow */
+        @media (max-width: 520px) {
+            table.grid td {
+                width: 12px;
+                height: 12px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Snake (No Canvas) — Colors & Patterns</h1>
+    <div>Score: <span id="score">0</span></div>
+
+    <div id="controls">
+        <button id="startBtn">Start</button>
+        <button id="pauseBtn">Pause</button>
+        <button id="restartBtn">Restart</button>
+    </div>
+
+    <div id="panels">
+        <div class="panel" id="colorPanel">
+            <h3>Snake Colors</h3>
+            <div>
+                <button onclick="setSnakeColor('red')">Red</button>
+                <button onclick="setSnakeColor('blue')">Blue</button>
+                <button onclick="setSnakeColor('green')">Green</button>
+                <button onclick="setSnakeColor('purple')">Purple</button>
+                <button onclick="setSnakeColor('black')">Black</button>
+                <button onclick="setSnakeColor('orange')">Orange</button>
+            </div>
+            <div style="margin-top:8px;">
+                Custom color:
+                <!-- color input may not be supported on Tiger; fallback to text box -->
+                <input type="color" id="colorPicker" onchange="setSnakeColor(this.value)">
+                <input type="text" id="colorText" placeholder="#rrggbb or name" onblur="setSnakeColor(this.value)"
+                    style="width:90px">
+            </div>
+
+            <h3 style="margin-top:12px;">Patterns</h3>
+            <div>
+                <button onclick="setPattern('none')">Normal</button>
+                <button onclick="setPattern('rainbow')">Rainbow</button>
+                <button onclick="setPattern('stripes')">Stripes</button>
+                <button onclick="setPattern('flash')">Flashing</button>
+                <button onclick="setPattern('disco')">Disco</button>
+            </div>
+
+            <h3 style="margin-top:12px;">Presets</h3>
+            <div>
+                <button onclick="applyPreset('neon')">Neon</button>
+                <button onclick="applyPreset('retro')">Retro</button>
+                <button onclick="applyPreset('pastel')">Pastel</button>
+            </div>
+        </div>
+
+        <div class="panel" id="foodPanel">
+            <h3>Food Colors</h3>
+            <div>
+                <button onclick="setFoodColor('red')">Red</button>
+                <button onclick="setFoodColor('yellow')">Yellow</button>
+                <button onclick="setFoodColor('pink')">Pink</button>
+                <button onclick="setFoodColor('lime')">Lime</button>
+                <button onclick="setFoodColor('gold')">Gold</button>
+            </div>
+            <div style="margin-top:8px;">
+                Custom food color:
+                <input type="color" id="foodPicker" onchange="setFoodColor(this.value)">
+                <input type="text" id="foodText" placeholder="#rrggbb or name" onblur="setFoodColor(this.value)"
+                    style="width:90px">
+            </div>
+
+            <h3 style="margin-top:12px;">Options</h3>
+            <div>
+                <label><input type="checkbox" id="wrap" checked> Wrap at edges</label><br>
+                <label>Grid size:
+                    <select id="gridSize" onchange="changeGridSize(this.value)">
+                        <option value="16">16×16</option>
+                        <option value="20" selected>20×20</option>
+                        <option value="24">24×24</option>
+                        <option value="30">30×30</option>
+                    </select>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div id="gameArea"></div>
+
+    <div id="info">
+        Controls: Arrow keys or WASD. Click Start to begin. Presets change snake color & pattern.
+    </div>
+
+    <script type="text/javascript">
+        // ====== Compatible Snake (table-based) with color & pattern support ======
+        (function () {
+            // Config
+            var gridN = 20;         // default grid size (gridN x gridN)
+            var tileSize = 18;      // visual size handled by CSS table cell
+            var speedMs = 120;      // game tick in milliseconds
+
+            // Game state
+            var grid = [];          // store references to cells [row][col]
+            var snake = [];         // array of {r,c} with head at index 0
+            var dir = { r: 0, c: 1 };
+            var nextDir = { r: 0, c: 1 };
+            var food = null;
+            var running = false;
+            var intervalId = null;
+            var score = 0;
+
+            // Color/pattern state
+            var snakeColor = "#2e8b57";
+            var snakeHeadColor = "#5cb85c";
+            var foodColor = "red";
+            var patternMode = "none"; // none, rainbow, stripes, flash, disco
+            var flashToggle = false;
+
+            // DOM anchors
+            var gameArea = document.getElementById('gameArea');
+            var scoreEl = document.getElementById('score');
+
+            // Utility: create grid table
+            function buildGrid(n) {
+                grid = [];
+                // remove children
+                while (gameArea.firstChild) gameArea.removeChild(gameArea.firstChild);
+
+                var table = document.createElement('table');
+                table.className = 'grid';
+                table.setAttribute('cellspacing', '0');
+                table.setAttribute('cellpadding', '0');
+
+                for (var r = 0; r < n; r++) {
+                    var tr = document.createElement('tr');
+                    var row = [];
+                    for (var c = 0; c < n; c++) {
+                        var td = document.createElement('td');
+                        td.style.backgroundColor = '#ffffff';
+                        // Save a data attribute for quick selection if needed
+                        td.setAttribute('data-r', r);
+                        td.setAttribute('data-c', c);
+                        tr.appendChild(td);
+                        row.push(td);
+                    }
+                    table.appendChild(tr);
+                    grid.push(row);
+                }
+                gameArea.appendChild(table);
+            }
+
+            // Reset game state
+            function resetGame() {
+                snake = [];
+                // place snake in center
+                var startR = Math.floor(gridN / 2);
+                var startC = Math.floor(gridN / 2);
+                var initialLength = Math.max(3, Math.floor(gridN / 4));
+                for (var i = 0; i < initialLength; i++) {
+                    snake.push({ r: startR, c: startC - i });
+                }
+                dir = { r: 0, c: 1 };
+                nextDir = { r: 0, c: 1 };
+                score = 0;
+                updateScore();
+                clearGridColors();
+                placeFood();
+                draw();
+            }
+
+            function clearGridColors() {
+                for (var r = 0; r < grid.length; r++) {
+                    for (var c = 0; c < grid[r].length; c++) {
+                        grid[r][c].style.backgroundColor = '#ffffff';
+                    }
+                }
+            }
+
+            // Place food in empty cell
+            function placeFood() {
+                var empty = [];
+                for (var r = 0; r < gridN; r++) {
+                    for (var c = 0; c < gridN; c++) {
+                        if (!cellHasSnake(r, c)) {
+                            empty.push({ r: r, c: c });
+                        }
+                    }
+                }
+                if (empty.length === 0) {
+                    food = null;
+                    return;
+                }
+                var p = empty[Math.floor(Math.random() * empty.length)];
+                food = { r: p.r, c: p.c };
+            }
+
+            function cellHasSnake(r, c) {
+                for (var i = 0; i < snake.length; i++) {
+                    if (snake[i].r === r && snake[i].c === c) return true;
+                }
+                return false;
+            }
+
+            // Draw current snake and food
+            function draw() {
+                // clear all cells first
+                clearGridColors();
+
+                // draw food
+                if (food) {
+                    var fcell = grid[food.r][food.c];
+                    fcell.style.backgroundColor = foodColor;
+                }
+
+                // draw snake
+                for (var i = 0; i < snake.length; i++) {
+                    var part = snake[i];
+                    var cell = grid[part.r][part.c];
+                    var colorToUse = snakeColor;
+
+                    // Pattern handling
+                    if (patternMode === 'rainbow') {
+                        var rainbow = ['red', 'orange', 'yellow', 'green', 'blue', 'purple'];
+                        colorToUse = rainbow[i % rainbow.length];
+                    } else if (patternMode === 'stripes') {
+                        // alternate between snakeColor and a lighter shade (white)
+                        colorToUse = (i % 2 === 0) ? snakeColor : '#ffffff';
+                    } else if (patternMode === 'flash') {
+                        colorToUse = flashToggle ? '#ffffff' : snakeColor;
+                    } else if (patternMode === 'disco') {
+                        // random color each segment per draw
+                        colorToUse = randomColorHex();
+                    } else {
+                        colorToUse = snakeColor;
+                    }
+
+                    // head color can be different or same
+                    if (i === 0) {
+                        cell.style.backgroundColor = snakeHeadColor || colorToUse;
+                    } else {
+                        cell.style.backgroundColor = colorToUse;
+                    }
+                }
+            }
+
+            // Random color helper (for disco)
+            function randomColorHex() {
+                // generate simple bright-ish hex color
+                var letters = '89ABCDEF';
+                var c = '#';
+                for (var i = 0; i < 6; i++) {
+                    c += letters[Math.floor(Math.random() * letters.length)];
+                }
+                return c;
+            }
+
+            // Game tick
+            function update() {
+                // apply buffered direction (prevent direct reverse)
+                if (!(nextDir.r === -dir.r && nextDir.c === -dir.c)) {
+                    dir = nextDir;
+                }
+
+                var head = { r: snake[0].r + dir.r, c: snake[0].c + dir.c };
+
+                // edges handling
+                var wrap = document.getElementById('wrap').checked;
+                if (wrap) {
+                    if (head.r < 0) head.r = gridN - 1;
+                    if (head.r >= gridN) head.r = 0;
+                    if (head.c < 0) head.c = gridN - 1;
+                    if (head.c >= gridN) head.c = 0;
+                } else {
+                    if (head.r < 0 || head.r >= gridN || head.c < 0 || head.c >= gridN) {
+                        gameOver();
+                        return;
+                    }
+                }
+
+                // collision with self?
+                if (cellHasSnake(head.r, head.c)) {
+                    gameOver();
+                    return;
+                }
+
+                snake.unshift(head); // add new head
+
+                // eat?
+                if (food && head.r === food.r && head.c === food.c) {
+                    score += 1;
+                    updateScore();
+                    placeFood();
+                    // optionally speed up slightly every 5 points
+                    if (score % 5 === 0 && speedMs > 40) {
+                        restartInterval(Math.max(40, speedMs - 10));
+                    }
+                } else {
+                    // remove tail
+                    snake.pop();
+                }
+
+                // flash toggle for pattern
+                if (patternMode === 'flash') {
+                    flashToggle = !flashToggle;
+                }
+
+                draw();
+            }
+
+            function updateScore() {
+                scoreEl.innerHTML = score;
+            }
+
+            function gameOver() {
+                stopGame();
+                alert('Game Over! Your score: ' + score);
+            }
+
+            // Controls: start, stop, restart
+            function startGame() {
+                if (running) return;
+                running = true;
+                if (!intervalId) {
+                    intervalId = setInterval(update, speedMs);
+                }
+            }
+
+            function stopGame() {
+                running = false;
+                if (intervalId) {
+                    clearInterval(intervalId);
+                    intervalId = null;
+                }
+            }
+
+            function restartGame() {
+                stopGame();
+                resetGame();
+                startGame();
+            }
+
+            function restartInterval(newMs) {
+                // change the tick speed
+                if (newMs) speedMs = newMs;
+                if (intervalId) {
+                    clearInterval(intervalId);
+                    intervalId = setInterval(update, speedMs);
+                }
+            }
+
+            // Input handlers
+            function keyDown(e) {
+                e = e || window.event;
+                var kc = e.keyCode;
+                // arrows: 37 left,38 up,39 right,40 down
+                if (kc === 37) { nextDir = { r: 0, c: -1 }; if (e.preventDefault) e.preventDefault(); }
+                if (kc === 38) { nextDir = { r: -1, c: 0 }; if (e.preventDefault) e.preventDefault(); }
+                if (kc === 39) { nextDir = { r: 0, c: 1 }; if (e.preventDefault) e.preventDefault(); }
+                if (kc === 40) { nextDir = { r: 1, c: 0 }; if (e.preventDefault) e.preventDefault(); }
+                // WASD: 65 A left, 87 W up, 68 D right, 83 S down
+                if (kc === 65) { nextDir = { r: 0, c: -1 }; }
+                if (kc === 87) { nextDir = { r: -1, c: 0 }; }
+                if (kc === 68) { nextDir = { r: 0, c: 1 }; }
+                if (kc === 83) { nextDir = { r: 1, c: 0 }; }
+            }
+
+            // Public-ish functions for UI buttons
+            window.setSnakeColor = function (c) {
+                if (!c) return;
+                // if user typed a colour name in the text box, accept it
+                snakeColor = c;
+                snakeHeadColor = c;
+                draw();
+            };
+
+            window.setFoodColor = function (c) {
+                if (!c) return;
+                foodColor = c;
+                draw();
+            };
+
+            window.setPattern = function (mode) {
+                patternMode = mode || 'none';
+                // if flashing, ensure flashToggle resets
+                flashToggle = false;
+                draw();
+            };
+
+            window.applyPreset = function (p) {
+                if (p === 'neon') {
+                    snakeColor = '#0ff'; // cyan-ish
+                    snakeHeadColor = '#ff0'; // yellow head
+                    patternMode = 'disco';
+                    foodColor = '#ff007f';
+                } else if (p === 'retro') {
+                    snakeColor = '#2e8b57';
+                    snakeHeadColor = '#5cb85c';
+                    patternMode = 'stripes';
+                    foodColor = '#d9534f';
+                } else if (p === 'pastel') {
+                    snakeColor = '#c3f0d6';
+                    snakeHeadColor = '#fff1a8';
+                    patternMode = 'none';
+                    foodColor = '#f6c1d1';
+                }
+                // reflect pickers (if supported)
+                var cp = document.getElementById('colorPicker');
+                if (cp) { try { cp.value = snakeColor; } catch (e) { } }
+                var fp = document.getElementById('foodPicker');
+                if (fp) { try { fp.value = foodColor; } catch (e) { } }
+                draw();
+            };
+
+            // grid size change
+            window.changeGridSize = function (val) {
+                var n = parseInt(val, 10) || 20;
+                gridN = n;
+                buildGrid(gridN);
+                resetGame();
+            };
+
+            // Init UI wiring
+            function wireUI() {
+                var s = document.getElementById('startBtn');
+                var p = document.getElementById('pauseBtn');
+                var r = document.getElementById('restartBtn');
+                if (s) s.onclick = startGame;
+                if (p) p.onclick = function () { if (running) stopGame(); else startGame(); };
+                if (r) r.onclick = restartGame;
+
+                // color text inputs: forward typed values to set functions
+                var ct = document.getElementById('colorText');
+                if (ct) ct.onblur = function () { setSnakeColor(this.value); };
+                var ft = document.getElementById('foodText');
+                if (ft) ft.onblur = function () { setFoodColor(this.value); };
+
+                // grid size select (already uses onchange)
+            }
+
+            // Initialization
+            function init() {
+                // build grid
+                buildGrid(gridN);
+                wireUI();
+                resetGame();
+
+                // keyboard
+                if (window.addEventListener) {
+                    window.addEventListener('keydown', keyDown, false);
+                } else if (window.attachEvent) {
+                    window.attachEvent('onkeydown', keyDown);
+                } else {
+                    window.onkeydown = keyDown;
+                }
+            }
+
+            // Start up
+            init();
+
+            // Expose a manual draw for debugging
+            window._snakeDraw = draw;
+
+        }()); // end closure
+    </script>
+</body>
+
+</html>

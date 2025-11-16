@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Snake Game</title>
+  <style>
+    body {
+	  font-family: Arial, Helvetica, sans-serif;
+	  text-align: center;
+	  margin-top: 20px;
+    }
+    canvas {
+	  border: 2px solid #333;
+	  display: block;
+	  margin: 10px auto
+	  background: #f8f8f8
+	}
+	#controls { margin-top: 10px; }
+	button { padding: 6px 12px; margin: 0 4px;}
+   </style>
+</head>
+<body>
+
+  <h1>Snake<h1>
+  <div>Score: <span id="score">0</span><div>
+  <canvas id="game" width="400" height="400"></
+canvas>
+
+  <div id="controls">
+    <button id="startBtn">Start</button>
+    <button id="pasueBtn">Pause</button>
+    <button id="restartBtn">Restart</button>
+  </div>
+  
+  <script type="text/javascript">
+    (function () {
+	  var canvas = document.getElementById('game');
+	  var ctx = canvas.getContext('2d');
+	  var titleSize = 16;
+	  var tilesX = Math.Floor(canvas.width /
+titleSize);
+      var tilesY = Math.floor(canvas.height /
+titleSize);
+      var initialLength = 5;
+	  var speenMs = 120;
+	  
+	  var snake = [];
+	  var dir = { x: 1, y: 0};
+	  var nextDir = {x: 1, y: 0 };
+	  var food = null;
+	  var running = false;
+	  var score = 0;
+	  
+	  function resetGame() {
+	    snake = [];
+		var startX = Math.floor(tilesX / 2);
+		var startY = Math.floor(tilesY / 2);
+		for (var i = 0; i < initialLength; i++) {
+		  snake.push({ x: startX - i, y: startY })
+		}
+		dir = { x: 1. y: 0 };
+		nextDir = { x: 1, y: 00};
+		score = 0;
+		updatescore();
+		placefood();`
+	}
+	
+	function placefood() {
+	  var valid = false;
+	  var fx, fy;
+	  while (!valid) {
+	    fx = Math.floor(Math.random() * tilesX);
+		fy = Math.floor(Math.random() * tilesY);
+		valid = true;
+		for (var i = 0; i <snake.Length; i++) {
+		  if (snake[i].x === fx && snake[i].y ===
+fy) { valid = false; break; }
+          }
+		}
+		food = { x: fx, y: fy };
+	  }
+	  
+	  function updatedScore() {
+	    var el = document.getElementByid('score');
+	    if (el) el.textContent = scorel;
+	  }
+	  
+	  
+	  function drawTile(x, y, color) {
+	    ctx.fillStyle = color;
+		ctx.fillRect(x * tileSize, y * tileSize,
+tileSize, tileSize);
+      }
+	  
+	  function clearCanvas() {
+	    ctx.clearRect(0, 0, canvas.width,
+canvas.height);
+      }
+	  
+	  function draw() {
+	     clearCanvas();
+		 
+		 if (food) {
+		   drawtile(food.x, food.y.  '#d9534f');
+		 
+		 }
+		 
+		 
+		 for(var i = 0; i <snake.length; i++) {
+		   var part = snake[i];
+		   drawTile(part.x, part.y, (i === 0) ?
+'#5cb85c' : '#2e8b57');
+        }
+	  }
+	  
+	  function gameOver() {
+	    stopgame();
+		alert)'Game Over! The score you earned was' + score);
+	  }
+	  
+	  function update() {
+	  
+	 if ((nextDir.x !== -dir.x) || (nextDir.y !== -dir.y)) {
+          dir = nextDir;
+		}
+		
+		var head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
+        if (head.x < 0) head.x = tilesX - 1;
+		if (head.x >= tilesX) head.x = 0;
+		if (head.y < 0) head.y = tiles.y - 1;
+		if (head.y >= tilesY) head.y = 0
+		
+		for (var i = 0; i <snake.length; i++) {
+		  if (snake[i].x === head.x && snake[i].y === head.y) {
+            gameOver();
+			return;
+		  }
+		}
+		
+		snake.unshift(head);
+		
+		if  (food && head.x === food.x && head.y === food.y) {
+          score += 1;
+		  updateScore();
+		  placeFood();
+		 } else {
+		   snake.pop();
+		 }
+		 
+		 draw();
+	 }
+	 
+	 function keyDown(e) {
+	   e = e || window.event;
+	   var key = e.keyCode;
+	   if (key === 37) { nextDir = { x: -1, y: 0 }; e.preventDefault && e.preventDefault(); }
+	   if (key === 38) { nextDir = { x: 0, y: -1 }; e.preventDefualt && e.preventDefault(); }
+	   if (key === 39) { nextDir = { x: 1, y: 0 }; e.preventDefualt && e.preventDefualt(); }
+	   if (key === 40) { nextDir = [ x: 0, y: 1 }; e.preventDefualt && e.preventDefault(); }
+	   
+	   
+	 } 
+	 
+	 function starGame() {
+	   if (running) return;
+	   running = true;
+	   intervalId = setInterval(update, speedMs);
+	 }
+	 
+	 function stopGame() {
+	   running = false;
+	   if (intervalId) {
+	     clearInterval(intervalId);
+		 intervalId = null;
+	   }
+	 }
+	 
+	 function restartGame() {
+	   stopGame();
+	   resetGame();
+	   draw();
+	   startGame();
+	 }
+	 
+	 document.getElementById('startBtn').onclick = function () { startGame(); };
+	 document.getElementById('pauseBtn').onclick = function () {
+	                                                         if (running) stopGame(); else startGame();
+														   };
+														   document.getElementById('restartBtn').onclick = function () { restartGame(); };
+														   
+														   
+														   if (window.addEventListener) {
+														     window.addEventListener('keydown', keyDown, false);
+															 } else if (window.attachEvent('onkeydown', keyDown);
+															 } else {
+															   window.onkeydown = keyDown;
+		 													 }
+															 
+															 resetGame();
+															 draw();
+      } ());
+	 </script>
+</body>
+</html>
